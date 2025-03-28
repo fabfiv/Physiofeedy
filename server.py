@@ -32,17 +32,18 @@ pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 counter = 0 
 stage = None 
-selected_exercise = 'squat'  
+selected_exercise = 'arm_raise'  
 recording = False  
 out = None  
 feedback_message = "" 
 
 
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose()
 
 def extract_key_frames(video_path, interval=30):
-    """Extracts multiple frames from the video."""
     cap = cv2.VideoCapture(video_path)
-    
+
     if not cap.isOpened():
         print("Error: Cannot open video file!") 
         return []
@@ -53,7 +54,6 @@ def extract_key_frames(video_path, interval=30):
     print(f"Video Opened | FPS: {frame_rate}, Total Frames: {total_frames}")  
 
     frame_interval = max(1, int(frame_rate * (interval / 30)))  
-
     frames = []
     count = 0
 
@@ -62,11 +62,21 @@ def extract_key_frames(video_path, interval=30):
         if not success:
             print(f"Stopped reading at frame {count}")  
             break
+
         if count % frame_interval == 0:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = pose.process(rgb_frame)
+
+            if results.pose_landmarks:
+                mp.solutions.drawing_utils.draw_landmarks(
+                    frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
+                )
+
             image_path = f"frame_{count}.jpg"
             cv2.imwrite(image_path, frame)
             frames.append(image_path)
-            print(f"Extracted frame: {image_path}")  
+            print(f"Extracted frame with landmarks: {image_path}")  
+
         count += 1
 
     cap.release()
@@ -75,7 +85,6 @@ def extract_key_frames(video_path, interval=30):
 
 
 def calculate_angle(a, b, c):
-    """Calculate the angle between three points (a-b-c)."""
     a = np.array(a)  
     b = np.array(b) 
     c = np.array(c)  
@@ -88,72 +97,66 @@ def calculate_angle(a, b, c):
     return angle
 
 
+
+
 def generate_frames():
-    global counter, stage, recording, out
+    global counter, stage, recording, out, selected_exercise
+    
     while True:
-        success, frame = camera.read()  
+        success, frame = camera.read()
         if not success:
-            print("Error: No frame captured from camera.")  
+            print("Error: No frame captured from camera.")
             break
         
         if recording and out is not None:
-            out.write(frame) 
-            print("Frame written to output.mp4") 
-        else:
-            
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image.flags.writeable = False  
-
-
-            results = pose.process(image)
-
-           
-            image.flags.writeable = True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            
-            
-            
-            if results.pose_landmarks:
-                landmarks = results.pose_landmarks.landmark
-
-            
-                hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
-                knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-                ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
-
-               
-                angle = calculate_angle(hip, knee, ankle)
-
-                
-                cv2.putText(image, str(int(angle)),tuple(np.multiply(knee, [640, 480]).astype(int)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-
-                
-                if angle > 160:
-                    stage = "down"
-                if angle < 120 and stage == "down":
-                    stage = "up"
-                    counter += 1  
-                    print(f"Reps: {counter}")
-
-                
-                cv2.putText(image, f"Reps: {counter}", (10, 50),cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                
-
-            
-            if results.pose_landmarks:
-                mp_drawing.draw_landmarks
-                (
-                    image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                    mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-                    mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
-                )
-
+            out.write(frame)  
+            print("Frame written to output.mp4")
         
-            _, buffer = cv2.imencode('.jpg', image)
-            frame = buffer.tobytes()
-
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image.flags.writeable = False  
+        
+        results = pose.process(image)  
+        
+        image.flags.writeable = True  
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        
+        if results.pose_landmarks:
+            landmarks = results.pose_landmarks.landmark
             
-            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            if selected_exercise == 'squat':
+                hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x, landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+                knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
+                ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+                angle = calculate_angle(hip, knee, ankle)
+            
+            elif selected_exercise == 'arm_raise':
+                shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+                elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+                wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+                angle = calculate_angle(shoulder, elbow, wrist)
+            
+            cv2.putText(image, f"Angle: {int(angle)}", tuple(np.multiply(knee if selected_exercise == 'squat' else elbow, [640, 480]).astype(int)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            if angle > 160:
+                stage = "down"
+            if angle < (120 if selected_exercise == 'squat' else 90) and stage == "down":
+                stage = "up"
+                counter += 1  # Increase rep count
+                print(f"{selected_exercise.capitalize()} Reps: {counter}")
+            
+            cv2.putText(image, f"Reps: {counter}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            
+            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS, mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
+        
+        if recording and out is not None:
+            out.write(image)  # Save processed frame with overlays to video
+            print("Frame written to output.mp4")
+        
+        
+        _, buffer = cv2.imencode('.jpg', image)
+        frame = buffer.tobytes()
+        
+        yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
 
@@ -180,7 +183,7 @@ def set_exercise():
     """Allows the user to select a different exercise."""
     global selected_exercise, counter
     data = Request.get_json()
-    selected_exercise = data.get("exercise", "squat") 
+    selected_exercise = data.get("exercise", "arm_raise") 
     counter = 0  
     return jsonify({"message": f"Exercise changed to {selected_exercise}"})
 
@@ -192,7 +195,7 @@ def start_recording():
     """Deletes old frames before recording a new video."""
     global recording, out, selected_exercise, counter
     data = request.get_json()
-    selected_exercise = data.get("exercise", "squat")  
+    selected_exercise = data.get("exercise", "arm_raise")  
     counter = 0  
     
     old_frames = glob.glob("frame_*.jpg")
@@ -208,7 +211,7 @@ def start_recording():
             return jsonify({"error": "Video writer failed"})
 
         recording = True
-        threading.Thread(target=stop_recording_after_delay, args=(10,)).start()
+        threading.Thread(target=stop_recording_after_delay, args=(30,)).start()
         print("Recording started...")  
 
     return jsonify({"message": "Recording started", "exercise": selected_exercise})
