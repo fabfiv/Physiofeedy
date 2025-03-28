@@ -88,54 +88,6 @@ def calculate_angle(a, b, c):
     return angle
 
 
-
-
-def process_exercise(results, image):
-    """Detects exercise-specific movements and updates the rep counter."""
-    global counter, stage, selected_exercise
-    
-    if results.pose_landmarks:
-        landmarks = results.pose_landmarks.landmark
-
-        if selected_exercise == 'squat':
-        
-            hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
-            knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-            ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
-
-            
-            angle = calculate_angle(hip, knee, ankle)
-
-            cv2.putText(image, str(int(angle)),tuple(np.multiply(knee, [640, 480]).astype(int)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-
-            if angle > 160:
-                stage = "down"
-            if angle < 120 and stage == "down":
-                stage = "up"
-                counter += 1  
-                print(f"Squats: {counter}")
-
-        elif selected_exercise == 'arm_raise':
-            shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-            elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-            wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-
-            angle = calculate_angle(shoulder, elbow, wrist)
-
-
-            cv2.putText(image, str(int(angle)),tuple(np.multiply(elbow, [640, 480]).astype(int)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-
-            
-            if angle > 160:
-                stage = "down"
-            if angle < 90 and stage == "down":
-                stage = "up"
-                counter += 1  
-                print(f"Arm Raises: {counter}")
-
-
-
-
 def generate_frames():
     global counter, stage, recording, out
     while True:
@@ -201,8 +153,7 @@ def generate_frames():
             frame = buffer.tobytes()
 
             
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
 
@@ -288,32 +239,6 @@ def stop_recording_after_delay(delay):
     time.sleep(delay)
     with app.app_context():  
         stop_recording()
-
-
-
-
-
-def extract_key_frames(video_path, interval=30):
-    """Extracts multiple frames from the video at a given time interval (default: every 1 sec)."""
-    cap = cv2.VideoCapture(video_path)
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)  
-    frame_interval = int(frame_rate * (interval / 30))  
-
-    frames = []
-    count = 0
-
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            break
-        if count % frame_interval == 0:
-            image_path = f"frame_{count}.jpg"
-            cv2.imwrite(image_path, frame)
-            frames.append(image_path)
-        count += 1
-
-    cap.release()
-    return frames
 
 
 
