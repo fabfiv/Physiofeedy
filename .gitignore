@@ -3,3 +3,5 @@ __pycache__/
 Backend/frames/*.jpg
 .env 
 output.mp4 
+Backend/instance
+Backend/__pycache__
