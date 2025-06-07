@@ -15,10 +15,8 @@ import time
 import glob
 import uuid
 from datetime import timedelta, datetime
-#import jwt
 from jwt.exceptions import ExpiredSignatureError, DecodeError  #InvalidTokenError
-#from flask_jwt_extended import decode_token
-
+import base64
 
 
 
@@ -56,7 +54,7 @@ pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 counter = 0 
 stage = None 
-selected_exercise = 'arm_raise'  
+selected_exercise = 'Arm Raises'  
 recording = False  
 out = None  
 feedback_message = "" 
@@ -68,116 +66,114 @@ pose = mp_pose.Pose()
 
 
 
-def is_pose_complete(landmarks, visibility_threshold=0.8, required_landmark_ratio=0.6):
-    """
-    Check if a sufficient number of landmarks are confidently detected.
-    """
-    visible_landmarks = [lm for lm in landmarks if lm.visibility > visibility_threshold]
-    completeness_ratio = len(visible_landmarks) / len(landmarks)
-    return completeness_ratio >= required_landmark_ratio
+# def is_pose_complete(landmarks, visibility_threshold=0.8, required_landmark_ratio=0.6):
+#     """
+#     Check if a sufficient number of landmarks are confidently detected.
+#     """
+#     visible_landmarks = [lm for lm in landmarks if lm.visibility > visibility_threshold]
+#     completeness_ratio = len(visible_landmarks) / len(landmarks)
+#     return completeness_ratio >= required_landmark_ratio
 
-def extract_key_frames(video_path, visibility_threshold=0.8, required_landmark_ratio=0.6):
-    """
-    Extracts only those frames from the video which contain almost all pose landmarks
-    with sufficient confidence.
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print("Error: Cannot open video file!")
-        return []
-
-    pose = mp_pose.Pose()
-    frames = []
-    frames_dir = os.path.join(os.getcwd(), "frames")
-    os.makedirs(frames_dir, exist_ok=True)
-
-    count = 0
-    saved_count = 0
-
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            break
-
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = pose.process(rgb_frame)
-
-        if results.pose_landmarks:
-            if is_pose_complete(results.pose_landmarks.landmark, visibility_threshold, required_landmark_ratio):
-                # Draw landmarks
-                mp_drawing.draw_landmarks(
-                    frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                    mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                    mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=2)
-                )
-
-                # Save the frame
-                image_path = os.path.join(frames_dir, f"frame_{count}.jpg")
-                cv2.imwrite(image_path, frame)
-                frames.append(image_path)
-                saved_count += 1
-                print(f"[{saved_count}] Frame saved (complete pose): {image_path}")
-            else:
-                print(f"[{count}] Incomplete pose — skipped.")
-        else:
-            print(f"[{count}] No pose detected — skipped.")
-
-        count += 1
-
-    cap.release()
-    pose.close()
-    print(f"\n✅ Done! Total saved complete-pose frames: {saved_count}")
-    return frames
-
-
-
-
-
-
-
-# def extract_key_frames(video_path, interval=30):
+# def extract_key_frames(video_path, visibility_threshold=0.8, required_landmark_ratio=0.6):
+#     """
+#     Extracts only those frames from the video which contain almost all pose landmarks
+#     with sufficient confidence.
+#     """
 #     cap = cv2.VideoCapture(video_path)
-
 #     if not cap.isOpened():
-#         print("Error: Cannot open video file!") 
+#         print("Error: Cannot open video file!")
 #         return []
 
-#     frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
-#     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-#     print(f"Video Opened | FPS: {frame_rate}, Total Frames: {total_frames}")  
-
-#     frame_interval = max(1, int(frame_rate * (interval / 30)))  
+#     pose = mp_pose.Pose()
 #     frames = []
-#     count = 0
-
 #     frames_dir = os.path.join(os.getcwd(), "frames")
 #     os.makedirs(frames_dir, exist_ok=True)
+
+#     count = 0
+#     saved_count = 0
 
 #     while cap.isOpened():
 #         success, frame = cap.read()
 #         if not success:
-#             print(f"Stopped reading at frame {count}")  
 #             break
 
-#         if count % frame_interval == 0:
-#             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-#             results = pose.process(rgb_frame)
+#         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#         results = pose.process(rgb_frame)
 
-#             if results.pose_landmarks:
-#                 mp.solutions.drawing_utils.draw_landmarks(
-#                     frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
+#         if results.pose_landmarks:
+#             if is_pose_complete(results.pose_landmarks.landmark, visibility_threshold, required_landmark_ratio):
+#                 # Draw landmarks
+#                 mp_drawing.draw_landmarks(
+#                     frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+#                     mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+#                     mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=2)
 #                 )
 
-#             image_path = os.path.join(frames_dir, f"frame_{count}.jpg")
-#             cv2.imwrite(image_path, frame)
-#             frames.append(image_path)
-#             print(f"Extracted frame with landmarks: {image_path}")  
+#                 # Save the frame
+#                 image_path = os.path.join(frames_dir, f"frame_{count}.jpg")
+#                 cv2.imwrite(image_path, frame)
+#                 frames.append(image_path)
+#                 saved_count += 1
+#                 print(f"[{saved_count}] Frame saved (complete pose): {image_path}")
+#             else:
+#                 print(f"[{count}] Incomplete pose — skipped.")
+#         else:
+#             print(f"[{count}] No pose detected — skipped.")
 
 #         count += 1
 
 #     cap.release()
+#     pose.close()
+#     print(f"\n Done! Total saved complete-pose frames: {saved_count}")
 #     return frames
+
+
+
+
+
+def extract_key_frames(video_path, interval=30):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Error: Cannot open video file!") 
+        return []
+
+    frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Video Opened | FPS: {frame_rate}, Total Frames: {total_frames}")  
+
+    frame_interval = max(1, int(frame_rate * (interval / 30)))  
+    frames = []
+    count = 0
+
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        frames_dir = os.path.join(os.getcwd(), "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+
+        while cap.isOpened():
+            success, frame = cap.read()
+            if not success:
+                print(f"Stopped reading at frame {count}")  
+                break
+
+            if count % frame_interval == 0:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = pose.process(rgb_frame)
+
+                if results.pose_landmarks:
+                    mp.solutions.drawing_utils.draw_landmarks(
+                        frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
+                    )
+
+                image_path = os.path.join(frames_dir, f"frame_{count}.jpg")
+                cv2.imwrite(image_path, frame)
+                frames.append(image_path)
+                print(f"Extracted frame with landmarks: {image_path}")  
+
+            count += 1
+
+    cap.release()
+    return frames
+
 
 
 
@@ -227,7 +223,7 @@ def generate_frames():
                 ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
                 angle = calculate_angle(hip, knee, ankle)
             
-            elif selected_exercise == 'arm_raise':
+            elif selected_exercise == 'Arm Raises':
                 shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
                 elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
                 wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
@@ -264,11 +260,6 @@ def home():
     return jsonify({"message": "Welcome to PhysioFeedy API!"}) 
 
 
-# @app.on_request
-# def init_db():
-#     with app.app_context():
-#         db.create_all()
-
     
     
 @app.route('/register', methods=['POST'])
@@ -283,16 +274,6 @@ def register():
     db.session.commit()
     return jsonify({'message': 'User registered successfully'})
 
-
-
-# @app.route('/login', methods=['POST'])
-# def login():
-#     data = request.get_json()
-#     user = User.query.filter_by(username=data['username']).first()
-#     if user and bcrypt.check_password_hash(user.password, data['password']):
-#         access_token = create_access_token(identity=str(user.id))
-#         return jsonify({'token': access_token})
-#     return jsonify({'message': 'Invalid credentials'}), 401
 
 
 @app.route('/login', methods=['POST'])
@@ -405,7 +386,7 @@ def get_reps():
 def set_exercise():
     global selected_exercise, counter
     data = Request.get_json()
-    selected_exercise = data.get("exercise", "arm_raise") 
+    selected_exercise = data.get("exercise", "Arm Raises") 
     counter = 0  
     return jsonify({"message": f"Exercise changed to {selected_exercise}"})
 
@@ -416,13 +397,14 @@ def set_exercise():
 def start_recording():
     global recording, out, selected_exercise, counter
     data = request.get_json()
-    selected_exercise = data.get("exercise", "arm_raise")  
+    selected_exercise = data.get("exercise", "Arm Raises")  
     counter = 0  
     
-    old_frames = glob.glob("frame_*.jpg")
+    frame_folder = "Backend/frames"
+    old_frames = glob.glob(os.path.join(frame_folder, "frame_*.jpg"))
     for frame in old_frames:
         os.remove(frame)
-        print(f"Deleted old frame: {frame}")  
+        print(f"Deleted old frame: {frame}") 
 
     if not recording:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -466,44 +448,82 @@ def stop_recording_after_delay(delay):
 
 
 
-@app.route('/analyze_video', methods=['POST'])
-def analyze_video():
+
+
+@app.route('/analyze_video', methods=['POST'])  
+@jwt_required()  
+def analyze_video(): 
+    import base64
     global feedback_message
+    user_id = get_jwt_identity()  
     video_file_path = 'output.mp4'
 
     if not os.path.exists(video_file_path):
-        print("Error: Video file does not exist!")  
         return jsonify({'error': 'Video file not found'}), 400
 
-    # frames = extract_key_frames(video_file_path)
-    frames = extract_key_frames(video_file_path, visibility_threshold=0.8, required_landmark_ratio=0.6)
+    frames = extract_key_frames(video_file_path)
     if not frames:
-        print("Error: No frames extracted from video!")  
         return jsonify({'error': 'No frames extracted'}), 500
 
     feedback_list = []
 
-    for image_path in frames[:5]:  
+    for image_path in frames[9:12]:  
         try:
             with open(image_path, "rb") as image_file:
-                response = openai.chat.completions.create(
-                    model="gpt-4-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are an AI providing exercise feedback."},
-                        {"role": "user", "content": "Analyze this image and provide feedback on posture and form."}
-                    ]
-                )
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+            response = openai.chat.completions.create(
+                model="gpt-4o",
+              messages = [
+                {
+                    "role": "system",
+                    "content": "You are an AI physiotherapy coach that gives short, structured, numerical feedback on exercise posture using images."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                },
+                {
+                    "type": "text",
+                    "text": f"""
+                    Analyze this image for the exercise: {selected_exercise}.
+                    Return output in exactly 1 line ONLY — no extra lines, no repetitions.
+
+                    Format:
+                        Range of motion: %, Accuracy: %, Alignment: %; [short comment on posture]; [short motivational suggestion].
+                        Only one set of the metrics (do NOT repeat Range/Accuracy/Alignment twice). Keep punctuation clean.
+                        """
+                }
+                ]
+            }
+        ]
+
+
+            )
 
             feedback_list.append(response.choices[0].message.content)
-            os.remove(image_path) 
-            print(f"Processed & deleted frame: {image_path}")  
+            os.remove(image_path)
 
         except Exception as e:
-            print(f"Error while processing frame: {e}")  
             return jsonify({'error': str(e)}), 500
 
-    feedback_message = " ".join(feedback_list)  
+    feedback_message = " ".join(feedback_list)
+
+   
+    new_entry = ExerciseHistory(
+        user_id=user_id,
+        exercise_name=selected_exercise,
+        feedback=feedback_message
+    )
+    db.session.add(new_entry)
+    db.session.commit()
+    print("Feedback stored in database.")
+
     return jsonify({'message': 'Video analysis complete', 'feedback': feedback_message})
+
 
 
 
